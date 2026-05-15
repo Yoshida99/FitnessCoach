@@ -9,6 +9,7 @@ import android.graphics.drawable.*;
 import android.text.InputType;
 import android.view.*;
 import android.widget.*;
+import android.animation.*;
 import java.io.*;
 import java.net.*;
 import java.text.*;
@@ -19,6 +20,8 @@ public class MainActivity extends Activity {
     SharedPreferences p;
     CountDownTimer timer;
     TextView activeTimer;
+    int timerLeftSec=0;
+    boolean timerPaused=false;
 
     final int BG=Color.rgb(5,6,8), CARD=Color.rgb(18,20,25), CARD2=Color.rgb(28,31,38);
     final int TEXT=Color.rgb(246,247,249), MUTED=Color.rgb(155,164,178), SILVER=Color.rgb(214,217,226), GOLD=Color.rgb(255,213,60), GREEN=Color.rgb(70,220,130), RED=Color.rgb(245,110,110);
@@ -45,9 +48,28 @@ public class MainActivity extends Activity {
 
     public void onCreate(Bundle b){
         super.onCreate(b);
-        p=getSharedPreferences("fitness_coach_107",0);
+        p=getSharedPreferences("fitness_coach_108",0);
         if(!p.contains("weight")) p.edit().putFloat("weight",70f).putFloat("waist",0f).putInt("streak",0).putString("model",DEFAULT_MODEL).apply();
-        splash();
+        if(!p.getBoolean("onboarding_done",false)) onboarding(); else splash();
+    }
+
+
+    void onboarding(){
+        screen("");
+        LinearLayout hero=card3d();
+        hero.addView(txt("FITNESS COACH 1.08",30,TEXT,true));
+        hero.addView(txt("Luxury Black • glassmorphism • AI Coach inside app",14,SILVER,false));
+        hero.addView(txt("Цель: 77 кг, убрать живот, +мышцы",16,GOLD,true));
+        hero.addView(txt("График: ПН / СР / ПТ / ВС",15,MUTED,false));
+        root.addView(hero);
+        LinearLayout perks=card3d();
+        perks.addView(txt("Premium UX",22,TEXT,true));
+        perks.addView(txt("• Плавные анимации карточек и кнопок",14,SILVER,false));
+        perks.addView(txt("• Таймер 60/90/120/180 + пауза/стоп",14,SILVER,false));
+        perks.addView(txt("• AI-анализ прогресса веса и тренировок",14,SILVER,false));
+        perks.addView(txt("• Haptic feedback и красивый фокус",14,SILVER,false));
+        root.addView(perks);
+        button("Начать",()->{p.edit().putBoolean("onboarding_done",true).apply();splash();});
     }
 
     void splash(){
@@ -56,7 +78,7 @@ public class MainActivity extends Activity {
         LinearLayout box=new LinearLayout(this); box.setOrientation(LinearLayout.VERTICAL); box.setGravity(Gravity.CENTER);
         ImageView logo=new ImageView(this); logo.setImageResource(res("hero_icon")); box.addView(logo,new LinearLayout.LayoutParams(dp(178),dp(178)));
         TextView title=txt("FITNESS COACH",32,TEXT,true); title.setGravity(Gravity.CENTER); box.addView(title);
-        TextView v=txt("v1.07 • 3D MINIMAL BLACK",14,SILVER,true); v.setGravity(Gravity.CENTER); box.addView(v);
+        TextView v=txt("v1.08 • 3D LUXURY BLACK",14,SILVER,true); v.setGravity(Gravity.CENTER); box.addView(v);
         f.addView(box,new FrameLayout.LayoutParams(-1,-1)); setContentView(f);
         new Handler().postDelayed(this::home,650);
     }
@@ -74,7 +96,7 @@ public class MainActivity extends Activity {
 
     void home(){
         screen("Fitness Coach");
-        add("Версия 1.07 • minimal 3D • OpenRouter AI",14,MUTED,false);
+        add("Версия 1.08 • premium glass UI • OpenRouter AI",14,MUTED,false);
         space(10);
         W today=today();
         LinearLayout hero=card3d();
@@ -95,6 +117,26 @@ public class MainActivity extends Activity {
         button("⏱ Таймер",this::timerScreen);
         button("🔑 OpenRouter API",this::apiSettings);
         button("⚙️ Настройки",this::settings);
+        bottomNav("home");
+    }
+
+
+    void bottomNav(String tab){
+        LinearLayout nav=card3d();
+        nav.setOrientation(LinearLayout.HORIZONTAL);
+        nav.addView(navBtn("🏠","Главная",tab.equals("home"),this::home),new LinearLayout.LayoutParams(0,-2,1));
+        nav.addView(navBtn("🏋️","Тренировки",tab.equals("workout"),this::workouts),new LinearLayout.LayoutParams(0,-2,1));
+        nav.addView(navBtn("📊","Прогресс",tab.equals("stats"),this::stats),new LinearLayout.LayoutParams(0,-2,1));
+        nav.addView(navBtn("🤖","AI",tab.equals("ai"),this::chat),new LinearLayout.LayoutParams(0,-2,1));
+        root.addView(nav);
+    }
+    LinearLayout navBtn(String icon,String label,boolean active,Runnable run){
+        LinearLayout b=new LinearLayout(this);b.setOrientation(LinearLayout.VERTICAL);b.setGravity(Gravity.CENTER);b.setPadding(dp(6),dp(4),dp(6),dp(4));
+        b.setBackground(round(active?Color.argb(145,255,213,60):Color.argb(120,34,38,46),16));
+        TextView i=txt(icon,18,active?Color.BLACK:SILVER,true);i.setGravity(Gravity.CENTER);b.addView(i);
+        TextView t=txt(label,11,active?Color.BLACK:SILVER,true);t.setGravity(Gravity.CENTER);b.addView(t);
+        b.setOnClickListener(v->{vibrate();run.run();});
+        return b;
     }
 
     W today(){int d=Calendar.getInstance().get(Calendar.DAY_OF_WEEK); if(d==Calendar.MONDAY)return workouts[0]; if(d==Calendar.WEDNESDAY)return workouts[1]; if(d==Calendar.FRIDAY)return workouts[2]; if(d==Calendar.SUNDAY)return workouts[3]; return workouts[0];}
@@ -112,6 +154,7 @@ public class MainActivity extends Activity {
         head.addView(txt("Выполнено: "+done+"/"+total+" • "+((done*100)/total)+"%",14,SILVER,true));
         ProgressBar bar=new ProgressBar(this,null,android.R.attr.progressBarStyleHorizontal);bar.setMax(total);bar.setProgress(done);head.addView(bar);root.addView(head);
         activeTimer=txt("⏱ таймер готов",17,SILVER,true);activeTimer.setGravity(Gravity.CENTER);root.addView(activeTimer);
+        button("⏸ Пауза / ▶ Продолжить",this::togglePauseTimer);
         button("⏹ Остановить таймер",()->stopTimer());
 
         for(int i=0;i<w.ex.length;i++){
@@ -170,8 +213,9 @@ public class MainActivity extends Activity {
     TextView badge(String s){TextView v=txt(s,13,Color.BLACK,true);v.setGravity(Gravity.CENTER);v.setBackground(round(GOLD,18));return v;}
     Button mini(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(12);b.setTextColor(TEXT);b.setBackground(round(Color.argb(150,35,39,48),16));b.setOnClickListener(v->r.run());return b;}
 
-    void startTimer(int sec){if(timer!=null)timer.cancel();timer=new CountDownTimer(sec*1000L,1000){public void onTick(long ms){long s=ms/1000;if(activeTimer!=null)activeTimer.setText("⏱ отдых "+String.format(Locale.US,"%02d:%02d",s/60,s%60));}public void onFinish(){if(activeTimer!=null)activeTimer.setText("🔥 отдых закончен");vibrate();toast("Отдых закончен");}}.start();}
-    void stopTimer(){if(timer!=null){timer.cancel();timer=null;}if(activeTimer!=null)activeTimer.setText("⏱ таймер остановлен");toast("Таймер остановлен");}
+    void startTimer(int sec){if(timer!=null)timer.cancel();timerLeftSec=sec;timerPaused=false;timer=new CountDownTimer(sec*1000L,1000){public void onTick(long ms){timerLeftSec=(int)(ms/1000);if(activeTimer!=null)activeTimer.setText("⏱ отдых "+String.format(Locale.US,"%02d:%02d",timerLeftSec/60,timerLeftSec%60));}public void onFinish(){timerLeftSec=0;if(activeTimer!=null)activeTimer.setText("🔥 отдых закончен");vibrate();toast("Отдых закончен");}}.start();}
+    void togglePauseTimer(){if(timerLeftSec<=0){toast("Сначала запусти таймер");return;}if(timerPaused){startTimer(timerLeftSec);toast("Таймер продолжен");}else {if(timer!=null)timer.cancel();timerPaused=true;if(activeTimer!=null)activeTimer.setText("⏸ пауза "+String.format(Locale.US,"%02d:%02d",timerLeftSec/60,timerLeftSec%60));toast("Таймер на паузе");}}
+    void stopTimer(){if(timer!=null){timer.cancel();timer=null;}timerLeftSec=0;timerPaused=false;if(activeTimer!=null)activeTimer.setText("⏱ таймер остановлен");toast("Таймер остановлен");}
 
     void workouts(){screen("Тренировки");for(W w:workouts){LinearLayout c=card3d();ImageView im=new ImageView(this);im.setImageResource(res(w.img));im.setScaleType(ImageView.ScaleType.CENTER_CROP);c.addView(im,new LinearLayout.LayoutParams(-1,dp(130)));c.addView(txt(w.day+" • "+w.title,22,TEXT,true));c.addView(txt(w.sub,14,MUTED,false));c.addView(txt(doneIn(w)+"/"+w.ex.length+" выполнено",14,SILVER,true));c.setOnClickListener(v->workout(w));root.addView(c);space(8);}back();}
 
@@ -201,14 +245,15 @@ public class MainActivity extends Activity {
     void apiSettings(){screen("OpenRouter API");EditText key=input("sk-or-...",3,false);key.setText(p.getString("or_key",""));root.addView(key);EditText model=input("openai/gpt-4o-mini",1,false);model.setText(p.getString("model",DEFAULT_MODEL));root.addView(model);button("💾 Сохранить",()->{p.edit().putString("or_key",key.getText().toString().trim()).putString("model",model.getText().toString().trim()).apply();toast("Сохранено");home();});button("✅ Проверить",()->{p.edit().putString("or_key",key.getText().toString().trim()).putString("model",model.getText().toString().trim()).apply();askAI("Ответь коротко: OpenRouter работает.");});add("Модели: openai/gpt-4o-mini, deepseek/deepseek-chat, anthropic/claude-3.7-sonnet.",13,SILVER,false);back();}
 
     void calendar(){screen("Календарь");Calendar cal=Calendar.getInstance();int month=cal.get(Calendar.MONTH);cal.set(Calendar.DAY_OF_MONTH,1);LinearLayout row=null;while(cal.get(Calendar.MONTH)==month){if(row==null||row.getChildCount()==4){row=new LinearLayout(this);row.setOrientation(LinearLayout.HORIZONTAL);root.addView(row);}String dt=new SimpleDateFormat("yyyy-MM-dd",Locale.US).format(cal.getTime());boolean ok=p.getBoolean("cal_"+dt,false);TextView cell=txt((ok?"✓ ":"• ")+cal.get(Calendar.DAY_OF_MONTH),16,ok?GOLD:SILVER,true);cell.setGravity(Gravity.CENTER);cell.setBackground(round(CARD,20));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,dp(58),1);lp.setMargins(dp(4),dp(4),dp(4),dp(4));row.addView(cell,lp);cal.add(Calendar.DAY_OF_MONTH,1);}back();}
-    void timerScreen(){screen("Таймер");activeTimer=txt("01:30",62,SILVER,true);activeTimer.setGravity(Gravity.CENTER);root.addView(activeTimer);button("60 сек",()->startTimer(60));button("90 сек",()->startTimer(90));button("120 сек",()->startTimer(120));button("180 сек",()->startTimer(180));button("⏹ Остановить",this::stopTimer);back();}
+    void timerScreen(){screen("Таймер");activeTimer=txt("01:30",62,SILVER,true);activeTimer.setGravity(Gravity.CENTER);root.addView(activeTimer);button("60 сек",()->startTimer(60));button("90 сек",()->startTimer(90));button("120 сек",()->startTimer(120));button("180 сек",()->startTimer(180));button("⏸ Пауза / ▶ Продолжить",this::togglePauseTimer);button("⏹ Остановить",this::stopTimer);back();}
     void settings(){screen("Настройки");button("Сбросить галочки недели",()->{SharedPreferences.Editor e=p.edit();for(W w:workouts)for(int i=0;i<w.ex.length;i++)e.putBoolean(w.day+"_"+i,false);e.apply();home();});button("Очистить чат",()->{p.edit().putString("chat","").apply();toast("Чат очищен");});button("Сбросить серию",()->{p.edit().putInt("streak",0).apply();home();});back();}
 
     String read(InputStream is)throws Exception{BufferedReader br=new BufferedReader(new InputStreamReader(is,"UTF-8"));StringBuilder sb=new StringBuilder();String l;while((l=br.readLine())!=null)sb.append(l);return sb.toString();}
     String esc(String s){return s.replace("\\","\\\\").replace("\"","\\\"").replace("\n","\\n").replace("\r","");}
-    void vibrate(){try{((android.os.Vibrator)getSystemService(VIBRATOR_SERVICE)).vibrate(170);}catch(Exception e){}}
-    LinearLayout card3d(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(16),dp(14),dp(16),dp(14));GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{Color.argb(245,25,28,34),Color.argb(232,8,10,14)});g.setCornerRadius(dp(30));g.setStroke(dp(1),Color.argb(120,214,217,226));l.setBackground(g);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(7),0,dp(7));l.setLayoutParams(lp);return l;}
-    void button(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(16);b.setTextColor(Color.BLACK);b.setTypeface(Typeface.DEFAULT_BOLD);b.setBackground(round(SILVER,24));b.setPadding(dp(10),dp(13),dp(10),dp(13));b.setOnClickListener(v->r.run());LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(7),0,dp(7));root.addView(b,lp);}
+    void vibrate(){try{((android.os.Vibrator)getSystemService(VIBRATOR_SERVICE)).vibrate(80);}catch(Exception e){}}
+    void animatePress(View v){ObjectAnimator.ofFloat(v,"scaleX",1f,0.97f,1f).setDuration(170).start();ObjectAnimator.ofFloat(v,"scaleY",1f,0.97f,1f).setDuration(170).start();}
+    LinearLayout card3d(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(16),dp(14),dp(16),dp(14));GradientDrawable g=new GradientDrawable(GradientDrawable.Orientation.TL_BR,new int[]{Color.argb(210,40,45,55),Color.argb(180,10,12,16)});g.setCornerRadius(dp(30));g.setStroke(dp(1),Color.argb(130,255,255,255));l.setBackground(g);l.setElevation(dp(8));LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(7),0,dp(7));l.setLayoutParams(lp);l.setAlpha(0f);l.animate().alpha(1f).setDuration(300).start();return l;}
+    void button(String s,Runnable r){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(16);b.setTextColor(Color.BLACK);b.setTypeface(Typeface.DEFAULT_BOLD);b.setBackground(round(SILVER,24));b.setPadding(dp(10),dp(13),dp(10),dp(13));b.setOnClickListener(v->{vibrate();animatePress(v);r.run();});LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.setMargins(0,dp(7),0,dp(7));root.addView(b,lp);}
     EditText input(String hint,int lines,boolean number){EditText e=new EditText(this);e.setHint(hint);e.setMinLines(lines);e.setGravity(Gravity.TOP);e.setTextColor(TEXT);e.setHintTextColor(MUTED);e.setBackground(round(CARD2,28));e.setPadding(dp(16),dp(14),dp(16),dp(14));if(number)e.setInputType(InputType.TYPE_CLASS_NUMBER|InputType.TYPE_NUMBER_FLAG_DECIMAL);return e;}
     TextView txt(String s,int z,int col,boolean bold){TextView v=new TextView(this);v.setText(s);v.setTextSize(z);v.setTextColor(col);v.setPadding(0,dp(5),0,dp(5));if(bold)v.setTypeface(Typeface.DEFAULT_BOLD);return v;}
     void add(String s,int z,int col,boolean bold){root.addView(txt(s,z,col,bold));}
