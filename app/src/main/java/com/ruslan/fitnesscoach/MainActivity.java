@@ -30,6 +30,7 @@ public class MainActivity extends Activity {
 
     static class Ex {String name,sets,reps,weight,group,img; Ex(String n,String s,String r,String w,String g,String img){name=n;sets=s;reps=r;weight=w;group=g;this.img=img;}}
     static class W {String day,title,sub,img; Ex[] ex; W(String d,String t,String s,String img,Ex[] e){day=d;title=t;sub=s;this.img=img;ex=e;}}
+    static class MealPlan {String id,title,type; int grams,qty,kcal; MealPlan(String i,String t,String tp,int g,int q,int k){id=i;title=t;type=tp;grams=g;qty=q;kcal=k;}}
 
     W[] workouts = new W[]{
         new W("ПН","Грудь + трицепс","Жим • грудь • пресс","chest",new Ex[]{
@@ -233,8 +234,53 @@ public class MainActivity extends Activity {
     void record(String a,String b,String c){LinearLayout x=card3d();x.addView(txt("🏆 "+a,18,TEXT,true));x.addView(txt(b,26,GOLD,true));x.addView(txt(c,13,MUTED,false));root.addView(x);space(8);}
     void measure(){screen("Замеры");EditText w=input("Вес",1,true);w.setText(String.valueOf(p.getFloat("weight",70)));root.addView(w);EditText waist=input("Талия",1,true);float old=p.getFloat("waist",0);waist.setText(old==0?"":String.valueOf(old));root.addView(waist);button("Сохранить",()->{try{SharedPreferences.Editor e=p.edit();e.putFloat("weight",Float.parseFloat(w.getText().toString().replace(",",".")));if(waist.getText().length()>0)e.putFloat("waist",Float.parseFloat(waist.getText().toString().replace(",",".")));e.apply();stats();}catch(Exception ex){toast("Введи числа");}});back();}
 
-    void nutrition(){screen("Питание");ImageView im=new ImageView(this);im.setImageResource(res("nutrition"));im.setScaleType(ImageView.ScaleType.CENTER_CROP);root.addView(im,new LinearLayout.LayoutParams(-1,dp(180)));meal("Завтрак","Овсянка 80 г + 3 яйца + банан","≈650 ккал");meal("Обед","Рис/гречка + курица 200 г + овощи","≈850 ккал");meal("Перекус","Творог 200 г + орехи 20 г","≈450 ккал");meal("Ужин","Рыба/мясо + картофель/гречка + салат","≈750 ккал");add("Цель: 2700–2900 ккал • белок 140–150 г",15,SILVER,true);button("💬 Составить меню AI",()->askAI("Составь меню на неделю на массу без роста живота."));back();}
-    void meal(String t,String food,String cal){LinearLayout c=card3d();c.addView(txt("🍽 "+t,19,TEXT,true));c.addView(txt(food,15,SILVER,false));c.addView(txt(cal,13,MUTED,false));CheckBox cb=new CheckBox(this);cb.setText("Съел");cb.setTextColor(SILVER);String key="meal_"+t+"_"+date();cb.setChecked(p.getBoolean(key,false));cb.setOnCheckedChangeListener((b,ch)->p.edit().putBoolean(key,ch).apply());c.addView(cb);root.addView(c);space(8);}
+    void nutrition(){
+        screen("Питание");
+        ImageView im=new ImageView(this);im.setImageResource(res("nutrition"));im.setScaleType(ImageView.ScaleType.CENTER_CROP);root.addView(im,new LinearLayout.LayoutParams(-1,dp(180)));
+        MealPlan[] meals=new MealPlan[]{
+                mealLoad("breakfast","Завтрак","Овсянка + яйца + банан",80,1,650),
+                mealLoad("lunch","Обед","Рис/гречка + курица + овощи",200,1,850),
+                mealLoad("snack","Перекус","Творог + орехи",200,1,450),
+                mealLoad("dinner","Ужин","Рыба/мясо + гарнир + салат",220,1,750)
+        };
+        int total=0;
+        for(MealPlan m:meals){ total+=m.kcal*m.qty; mealCard(m); }
+        add("Цель: 2700–2900 ккал • белок 140–150 г",15,SILVER,true);
+        add("Текущий план: ~"+total+" ккал",14,GOLD,true);
+        button("💬 Составить меню AI",()->askAI("Составь меню на неделю на массу без роста живота и с контролем талии."));
+        back();
+    }
+    MealPlan mealLoad(String id,String title,String type,int grams,int qty,int kcal){
+        String t=p.getString("meal_type_"+id,type);
+        int g=p.getInt("meal_grams_"+id,grams);
+        int q=p.getInt("meal_qty_"+id,qty);
+        return new MealPlan(id,title,t,g,q,kcal);
+    }
+    void mealCard(MealPlan m){
+        LinearLayout c=card3d();
+        c.addView(txt("🍽 "+m.title,19,TEXT,true));
+        c.addView(txt(m.type,15,SILVER,false));
+        c.addView(txt("Вес: "+m.grams+" г • Кол-во: "+m.qty+" • ≈"+(m.kcal*m.qty)+" ккал",13,MUTED,false));
+        CheckBox cb=new CheckBox(this);cb.setText("Съел");cb.setTextColor(SILVER);String key="meal_"+m.id+"_"+date();cb.setChecked(p.getBoolean(key,false));cb.setOnCheckedChangeListener((b,ch)->p.edit().putBoolean(key,ch).apply());c.addView(cb);
+        Button edit=mini("⚙ Изменить еду",()->editMeal(m)); c.addView(edit,new LinearLayout.LayoutParams(-1,dp(44)));
+        root.addView(c);space(8);
+    }
+    void editMeal(MealPlan m){
+        AlertDialog.Builder b=new AlertDialog.Builder(this);
+        LinearLayout box=new LinearLayout(this);box.setOrientation(LinearLayout.VERTICAL);box.setPadding(dp(16),dp(16),dp(16),dp(8));
+        EditText type=input("Тип еды",1,false);type.setText(m.type);box.addView(type);
+        TextView gramsLabel=txt("Граммы: "+m.grams+" г",14,TEXT,true);box.addView(gramsLabel);
+        SeekBar grams=new SeekBar(this);grams.setMax(600);grams.setProgress(m.grams);box.addView(grams);
+        TextView qtyLabel=txt("Количество порций: "+m.qty,14,TEXT,true);box.addView(qtyLabel);
+        SeekBar qty=new SeekBar(this);qty.setMax(5);qty.setProgress(Math.max(1,m.qty));box.addView(qty);
+        grams.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int v,boolean f){gramsLabel.setText("Граммы: "+Math.max(20,v)+" г");}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}});
+        qty.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener(){public void onProgressChanged(SeekBar s,int v,boolean f){qtyLabel.setText("Количество порций: "+Math.max(1,v));}public void onStartTrackingTouch(SeekBar s){}public void onStopTrackingTouch(SeekBar s){}});
+        b.setTitle("Настройка: "+m.title).setView(box).setNegativeButton("Отмена",null).setPositiveButton("Сохранить",(d,w)->{
+            p.edit().putString("meal_type_"+m.id,type.getText().toString().trim()).putInt("meal_grams_"+m.id,Math.max(20,grams.getProgress())).putInt("meal_qty_"+m.id,Math.max(1,qty.getProgress())).apply();
+            toast("Питание обновлено");
+            nutrition();
+        }).show();
+    }
 
     void chat(){screen("AI Coach");add("Модель: "+p.getString("model",DEFAULT_MODEL),13,SILVER,true);LinearLayout h=card3d();String hist=p.getString("chat","");if(hist.length()==0)hist="AI Coach готов. Вставь OpenRouter ключ и спрашивай.";h.addView(txt(hist,15,TEXT,false));root.addView(h);EditText q=input("Напиши вопрос...",4,false);root.addView(q);button("➡️ Отправить",()->{String s=q.getText().toString().trim();if(s.length()<2){toast("Напиши вопрос");return;}askAI(s);});button("🍗 Меню на массу",()->askAI("Составь меню на день на массу без роста живота."));button("🏋️ Что тренировать сегодня?",()->askAI("Что тренировать сегодня по моему графику?"));button("💪 Почему не растёт жим?",()->askAI("Жим лёжа стоит. Что делать?"));button("🧹 Очистить чат",()->{p.edit().putString("chat","").apply();chat();});back();}
     void askAI(String q){String key=p.getString("or_key","");if(key.length()<20){toast("Сначала вставь OpenRouter API ключ");apiSettings();return;}append("Ты: "+q+"\n\nТренер: печатает...\n\n");chat();new Thread(()->{String ans;try{ans=openRouter(q,p.getString("model",DEFAULT_MODEL));}catch(Exception ex){try{ans=openRouter(q,"deepseek/deepseek-chat");}catch(Exception ex2){ans=friendly(ex2.getMessage());}}String old=p.getString("chat","");old=old.replace("Тренер: печатает...\n\n","Тренер: "+ans+"\n\n");p.edit().putString("chat",old).apply();runOnUiThread(this::chat);}).start();}
