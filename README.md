@@ -1,3 +1,5 @@
+<p align="center"><img src="branding/logo.svg" alt="Логотип Fitness Coach" width="136"></p>
+
 # Fitness Coach 1.08
 
 Обновлено в версии 1.08:
