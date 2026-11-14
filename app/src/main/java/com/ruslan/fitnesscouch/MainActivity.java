@@ -385,7 +385,7 @@ public class MainActivity extends Activity {
         c.addView(hint);
 
         if (!e.bodyweight()) {
-            final TextView wText = t(Fmt.n(w[0]) + " кг", 22, GOLD, true);
+            final TextView wText = t(Fmt.n(w[0]) + " кг", 21, GOLD, true);
             wText.setGravity(Gravity.CENTER);
             final NumCb setW = v -> {
                 w[0] = Math.max(0, Math.round(v * 4) / 4f);
@@ -397,9 +397,13 @@ public class MainActivity extends Activity {
             hint.setOnClickListener(v -> { if (sug > 0 && w[0] < sug) setW.on(sug); });
             LinearLayout wr = row();
             wr.setPadding(0, dp(6), 0, dp(2));
-            wr.addView(square("−", () -> setW.on(w[0] - e.step)), new LinearLayout.LayoutParams(dp(52), dp(46)));
+            // В каждом упражнении есть шаг 1 кг; где у снаряда шаг крупнее — рядом кнопки с этим шагом.
+            final boolean big = e.step > 1.01f;
+            if (big) wr.addView(stepBtn("−" + Fmt.n(e.step), () -> setW.on(w[0] - e.step)), stepLp(0, 6));
+            wr.addView(stepBtn("−1", () -> setW.on(w[0] - 1)), stepLp(0, 0));
             wr.addView(wText, new LinearLayout.LayoutParams(0, dp(46), 1));
-            wr.addView(square("+", () -> setW.on(w[0] + e.step)), new LinearLayout.LayoutParams(dp(52), dp(46)));
+            wr.addView(stepBtn("+1", () -> setW.on(w[0] + 1)), stepLp(0, 0));
+            if (big) wr.addView(stepBtn("+" + Fmt.n(e.step), () -> setW.on(w[0] + e.step)), stepLp(6, 0));
             c.addView(wr);
         }
 
@@ -1273,7 +1277,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Fitness Couch 2.0.1", 12, MUTED, false));
+        body.addView(t("Fitness Couch 2.0.2", 12, MUTED, false));
     }
 
     void restore() {
@@ -1447,6 +1451,18 @@ public class MainActivity extends Activity {
         b.setBackground(tap(CARD2, 14, LINE));
         b.setOnClickListener(v -> r.run());
         return b;
+    }
+
+    TextView stepBtn(String s, final Runnable r) {
+        TextView b = square(s, r);
+        b.setTextSize(15);
+        return b;
+    }
+
+    LinearLayout.LayoutParams stepLp(int leftDp, int rightDp) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(50), dp(46));
+        lp.setMargins(dp(leftDp), 0, dp(rightDp), 0);
+        return lp;
     }
 
     TextView link(String s, final Runnable r) {
