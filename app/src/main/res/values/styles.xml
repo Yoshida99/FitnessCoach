@@ -1,10 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-<style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
-    <item name="android:windowBackground">#050608</item>
-    <item name="android:statusBarColor">#050608</item>
-    <item name="android:navigationBarColor">#050608</item>
-    <item name="android:windowLightStatusBar">false</item>
-    <item name="android:fontFamily">sans</item>
-    <item name="android:colorAccent">#D6D9DE</item>
-</style>
+    <color name="ic_launcher_background">#050506</color>
+    <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#050506</item>
+        <item name="android:statusBarColor">#050506</item>
+        <item name="android:navigationBarColor">#050506</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:colorAccent">#D9B45A</item>
+    </style>
 </resources>

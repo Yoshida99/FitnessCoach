@@ -1,0 +1,41 @@
+name: Build APK
+
+on:
+  push:
+    branches: ["claude/fitness-couch-v2"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: fitness-couch-v2-latest
+    steps:
+      - name: Checkout
+        run: |
+          git clone --depth 1 --branch "$GITHUB_REF_NAME" "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" .
+
+      - name: Build debug APK
+        run: |
+          export JAVA_HOME="${JAVA_HOME_21_X64:-$JAVA_HOME}"
+          chmod +x gradlew
+          ./gradlew --no-daemon :app:assembleDebug
+
+      - name: Publish APK as a release
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk FitnessCouch-2.0.apk
+          gh release delete "$TAG" --yes --cleanup-tag || true
+          sleep 3
+          gh release create "$TAG" FitnessCouch-2.0.apk \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "Fitness Couch 2.0 (сборка $GITHUB_RUN_NUMBER)" \
+            --notes "Автоматическая сборка из ветки $GITHUB_REF_NAME. Скачай FitnessCouch-2.0.apk на телефон и открой его."
