@@ -56,7 +56,7 @@ import java.util.Set;
 public class MainActivity extends Activity {
     static final int BG = 0xFF050506, CARD = 0xFF111215, CARD2 = 0xFF1C1E24, LINE = 0x40D9B45A,
             TEXT = 0xFFF7F7F6, MUTED = 0xFF9A9EA8, SILVER = 0xFFDADCE1, GOLD = 0xFFD9B45A, RED = 0xFFF06969;
-    static final String DEFAULT_MODEL = "openai/gpt-4o-mini", FALLBACK_MODEL = "deepseek/deepseek-chat";
+    static final String DEFAULT_MODEL = "google/gemma-4-31b-it:free", FALLBACK_MODEL = "openrouter/free";
     static final Locale RU = new Locale("ru");
     static final int MATCH = -1, WRAP = -2;
 
@@ -93,6 +93,13 @@ public class MainActivity extends Activity {
         super.onCreate(b);
         st = new Store(this);
         p = st.p;
+        // Разовый переход со старой модели по умолчанию на бесплатную; свой выбор пользователя не трогаем.
+        if (!p.getBoolean("model_default_v2", false)) {
+            String m = p.getString("model", "").trim();
+            SharedPreferences.Editor e = p.edit().putBoolean("model_default_v2", true);
+            if (m.isEmpty() || m.equals("openai/gpt-4o-mini")) e.putString("model", DEFAULT_MODEL);
+            e.apply();
+        }
 
         shell = col();
         shell.setBackgroundColor(BG);
@@ -1129,7 +1136,7 @@ public class MainActivity extends Activity {
 
     void aiSettings() {
         topBar("Настройки AI");
-        body.addView(t("Тренер работает через OpenRouter. Ключ создаётся на openrouter.ai/keys, для платных моделей нужен баланс. "
+        body.addView(t("Тренер работает через OpenRouter. Ключ создаётся бесплатно на openrouter.ai/keys. Модели с «:free» в названии бесплатны (до 200 запросов в день), для остальных нужен баланс. "
                 + "Ключ хранится только на этом телефоне и не попадает в резервную копию.", 14, MUTED, false));
         body.addView(label("Ключ OpenRouter"));
         final EditText key = input("sk-or-…", false);
@@ -1278,7 +1285,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Fitness Couch 2.0.2", 12, MUTED, false));
+        body.addView(t("Fitness Couch 2.0.3", 12, MUTED, false));
     }
 
     void restore() {
