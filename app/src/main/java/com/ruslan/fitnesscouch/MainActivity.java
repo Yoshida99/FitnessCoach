@@ -11,8 +11,12 @@ import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
+import android.media.AudioAttributes;
+import android.media.AudioFormat;
 import android.media.AudioManager;
-import android.media.ToneGenerator;
+import android.media.AudioTrack;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -73,6 +77,8 @@ public class MainActivity extends Activity {
     ProgressBar timerProg;
     long timerEnd;
     int timerTotal;
+    AudioTrack track;
+    Ringtone ring;
 
     // AI
     boolean aiBusy;
@@ -123,6 +129,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         ui.removeCallbacksAndMessages(null);
+        stopSignal();
         super.onDestroy();
     }
 
@@ -576,8 +583,8 @@ public class MainActivity extends Activity {
                 timerEnd = 0;
                 timerText.setText("Отдых окончен — следующий подход");
                 timerProg.setProgress(0);
-                vibrate(500);
-                beep();
+                vibrateEnd();
+                playSignal(signal());
                 ui.postDelayed(() -> { if (timerEnd == 0) timerBar.setVisibility(View.GONE); }, 5000);
                 return;
             }
@@ -620,27 +627,82 @@ public class MainActivity extends Activity {
             body.addView(r);
         }
         body.addView(btn("Остановить", false, this::stopRest));
-        body.addView(toggle("Звуковой сигнал в конце отдыха", "beep", true));
+        body.addView(btn("Сигнал в конце отдыха: " + Signal.name(signal()), false, () -> open(this::signalScreen)));
     }
 
-    void vibrate(long ms) {
+    void vibrateEnd() {
+        long[] pattern = {0, 350, 150, 350, 150, 600};
         try {
             Vibrator v = (Vibrator) getSystemService(VIBRATOR_SERVICE);
             if (v == null) return;
-            if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE));
-            else v.vibrate(ms);
+            if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createWaveform(pattern, -1));
+            else v.vibrate(pattern, -1);
         } catch (Exception ignored) {
         }
     }
 
-    void beep() {
-        if (!p.getBoolean("beep", true)) return;
+    /** Выбранный сигнал. Старая настройка «звук выключен» из 2.0 переносится как «Без звука». */
+    String signal() {
+        String s = p.getString("signal", "");
+        return s.isEmpty() ? (p.getBoolean("beep", true) ? Signal.DEFAULT : "none") : s;
+    }
+
+    /** Сигнал идёт по каналу будильника: он громче канала уведомлений и не глушится беззвучным режимом. */
+    void playSignal(String id) {
+        stopSignal();
+        if ("none".equals(id)) return;
         try {
-            final ToneGenerator tg = new ToneGenerator(AudioManager.STREAM_NOTIFICATION, 90);
-            tg.startTone(ToneGenerator.TONE_PROP_BEEP2, 500);
-            ui.postDelayed(tg::release, 900);
+            AudioAttributes attrs = new AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build();
+            if ("system".equals(id)) {
+                ring = RingtoneManager.getRingtone(this, RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION));
+                if (ring != null) {
+                    ring.setAudioAttributes(attrs);
+                    ring.play();
+                }
+                return;
+            }
+            short[] pcm = Signal.build(id);
+            AudioFormat format = new AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(Signal.RATE).setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build();
+            final AudioTrack tr = new AudioTrack(attrs, format, pcm.length * 2, AudioTrack.MODE_STATIC, AudioManager.AUDIO_SESSION_ID_GENERATE);
+            tr.write(pcm, 0, pcm.length);
+            tr.play();
+            track = tr;
+            ui.postDelayed(() -> { if (track == tr) stopSignal(); }, Signal.durationMs(id) + 400);
         } catch (Exception ignored) {
         }
+    }
+
+    void stopSignal() {
+        try {
+            if (track != null) track.release();
+            if (ring != null && ring.isPlaying()) ring.stop();
+        } catch (Exception ignored) {
+        }
+        track = null;
+        ring = null;
+    }
+
+    void signalScreen() {
+        topBar("Сигнал таймера");
+        body.addView(t("Нажми на вариант, чтобы выбрать его и послушать. Сигнал играет на громкости будильника, поэтому слышен и в беззвучном режиме.",
+                14, MUTED, false));
+        AudioManager am = (AudioManager) getSystemService(AUDIO_SERVICE);
+        if (am != null && am.getStreamVolume(AudioManager.STREAM_ALARM) == 0) {
+            body.addView(t("Громкость будильника на телефоне сейчас на нуле — сигнала не будет слышно. Прибавь её в настройках звука.", 14, RED, false));
+        }
+        String cur = signal();
+        for (int i = 0; i < Signal.IDS.length; i++) {
+            final String id = Signal.IDS[i];
+            boolean sel = id.equals(cur);
+            body.addView(btn((sel ? "✓  " : "") + Signal.NAMES[i], sel, () -> {
+                p.edit().putString("signal", id).apply();
+                refresh();
+                playSignal(id);
+            }));
+        }
+        body.addView(t("В конце отдыха телефон также вибрирует тремя импульсами.", 13, MUTED, false));
     }
 
     // ════════════════════════════════ Прогресс ════════════════════════════════
@@ -1191,7 +1253,7 @@ public class MainActivity extends Activity {
         topBar("Настройки");
         body.addView(btn("Профиль", false, () -> open(() -> profile(false))));
         body.addView(btn("AI-тренер: ключ и модель", false, () -> open(this::aiSettings)));
-        body.addView(toggle("Звуковой сигнал в конце отдыха", "beep", true));
+        body.addView(btn("Сигнал в конце отдыха: " + Signal.name(signal()), false, () -> open(this::signalScreen)));
 
         body.addView(label("Резервная копия"));
         body.addView(t("Данные хранятся только на этом телефоне. Перед сменой телефона или переустановкой скопируй их и сохрани, например, в «Избранном» в мессенджере.",
@@ -1211,7 +1273,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Fitness Couch 2.0", 12, MUTED, false));
+        body.addView(t("Fitness Couch 2.0.1", 12, MUTED, false));
     }
 
     void restore() {
@@ -1435,16 +1497,6 @@ public class MainActivity extends Activity {
         lp.setMargins(0, dp(4), 0, 0);
         e.setLayoutParams(lp);
         return e;
-    }
-
-    TextView toggle(final String title, final String key, final boolean def) {
-        final TextView[] b = new TextView[1];
-        b[0] = btn("", false, () -> {
-            p.edit().putBoolean(key, !p.getBoolean(key, def)).apply();
-            b[0].setText(title + ": " + (p.getBoolean(key, def) ? "вкл" : "выкл"));
-        });
-        b[0].setText(title + ": " + (p.getBoolean(key, def) ? "вкл" : "выкл"));
-        return b[0];
     }
 
     void topBar(String title) {
