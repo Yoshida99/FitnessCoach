@@ -387,6 +387,7 @@ public class MainActivity extends Activity {
         if (!e.bodyweight()) {
             final TextView wText = t(Fmt.n(w[0]) + " кг", 21, GOLD, true);
             wText.setGravity(Gravity.CENTER);
+            wText.setMaxLines(1);
             final NumCb setW = v -> {
                 w[0] = Math.max(0, Math.round(v * 4) / 4f);
                 p.edit().putFloat("w_" + e.id, w[0]).apply();
@@ -1460,7 +1461,7 @@ public class MainActivity extends Activity {
     }
 
     LinearLayout.LayoutParams stepLp(int leftDp, int rightDp) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(50), dp(46));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(46), dp(46));
         lp.setMargins(dp(leftDp), 0, dp(rightDp), 0);
         return lp;
     }
