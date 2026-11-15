@@ -37,5 +37,5 @@ jobs:
           sleep 3
           gh release create "$TAG" FitnessCoach.apk \
             --target "$GITHUB_SHA" --prerelease \
-            --title "Фитнес-коуч (сборка $GITHUB_RUN_NUMBER)" \
+            --title "FitnessCoach (сборка $GITHUB_RUN_NUMBER)" \
             --notes "Автоматическая сборка из ветки $GITHUB_REF_NAME. Скачай FitnessCoach.apk на телефон и открой его."

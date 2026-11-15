@@ -7,8 +7,8 @@ android {
         applicationId = "com.ruslan.fitnesscouch"
         minSdk = 23
         targetSdk = 36
-        versionCode = 205
-        versionName = "2.0.5"
+        versionCode = 206
+        versionName = "2.0.6"
     }
     // Общий отладочный ключ: сборки с GitHub и из Android Studio подписаны одинаково
     // и ставятся друг поверх друга без удаления приложения. Для публикации в магазине нужен отдельный ключ.

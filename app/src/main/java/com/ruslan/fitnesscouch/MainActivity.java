@@ -157,7 +157,7 @@ public class MainActivity extends Activity {
         box.setGravity(Gravity.CENTER);
         ExerciseView fig = new ExerciseView(this, Moves.get("squat"), 1f, BG);
         box.addView(fig, new LinearLayout.LayoutParams(dp(280), dp(182)));
-        SpannableString name = new SpannableString("ФИТНЕС-КОУЧ");
+        SpannableString name = new SpannableString("FITNESSCOACH");
         name.setSpan(new ForegroundColorSpan(GOLD), 7, name.length(), 0);
         TextView title = t("", 34, TEXT, true);
         title.setText(name);
@@ -286,7 +286,7 @@ public class MainActivity extends Activity {
         Program.Day day = Program.forDow(now.get(Calendar.DAY_OF_WEEK));
 
         body.addView(label(new SimpleDateFormat("EEEE, d MMMM", RU).format(now.getTime())));
-        body.addView(t(name().isEmpty() ? "Фитнес-коуч" : "Привет, " + name(), 28, TEXT, true));
+        body.addView(t(name().isEmpty() ? "FitnessCoach" : "Привет, " + name(), 28, TEXT, true));
         weekStrip();
 
         LinearLayout c = card();
@@ -1167,7 +1167,7 @@ public class MainActivity extends Activity {
         int[] tg = targets();
         float rate = st.weeklyRate(), waist = st.latest("waist", 0);
         StringBuilder s = new StringBuilder();
-        s.append("Ты персональный фитнес-тренер в приложении «Фитнес-коуч». Отвечай по-русски, конкретно и по делу, ")
+        s.append("Ты персональный фитнес-тренер в приложении FitnessCoach. Отвечай по-русски, конкретно и по делу, ")
                 .append("простым текстом без Markdown-разметки. Называй точные веса, подходы и повторы, опираясь на данные ниже. ")
                 .append("Не ставь диагнозов; при боли советуй снизить нагрузку и обратиться к врачу.\n\n");
         s.append("Атлет: ").append(name().isEmpty() ? "без имени" : name()).append(male() ? ", мужчина, " : ", женщина, ")
@@ -1503,7 +1503,7 @@ public class MainActivity extends Activity {
                 13, MUTED, false));
         body.addView(btn("Скопировать все данные", false, () -> {
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(ClipData.newPlainText("Фитнес-коуч", st.export()));
+            cm.setPrimaryClip(ClipData.newPlainText("FitnessCoach", st.export()));
             toast("Скопировано в буфер обмена");
         }));
         body.addView(btn("Восстановить из копии", false, () -> open(this::restore)));
@@ -1516,7 +1516,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Фитнес-коуч · версия 2.0.5", 12, MUTED, false));
+        body.addView(t("FitnessCoach · версия 2.0.6", 12, MUTED, false));
     }
 
     void restore() {
@@ -1539,7 +1539,7 @@ public class MainActivity extends Activity {
 
     void profile(final boolean first) {
         if (first) {
-            body.addView(label("Фитнес-коуч"));
+            body.addView(label("FitnessCoach"));
             body.addView(t("Пара вопросов о тебе", 26, TEXT, true));
             body.addView(t("По этим данным считаются калории и цель по весу, и их видит AI-тренер.", 14, MUTED, false));
         } else {
