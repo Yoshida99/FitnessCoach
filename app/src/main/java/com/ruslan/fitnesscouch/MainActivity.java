@@ -56,7 +56,9 @@ import java.util.Set;
 public class MainActivity extends Activity {
     static final int BG = 0xFF050506, CARD = 0xFF111215, CARD2 = 0xFF1C1E24, LINE = 0x40D9B45A,
             TEXT = 0xFFF7F7F6, MUTED = 0xFF9A9EA8, SILVER = 0xFFDADCE1, GOLD = 0xFFD9B45A, RED = 0xFFF06969;
-    static final String DEFAULT_MODEL = "google/gemma-4-31b-it:free", FALLBACK_MODEL = "openrouter/free";
+    static final String DEFAULT_MODEL = "google/gemma-4-31b-it:free";
+    /** Запасные бесплатные модели: если выбранная перегружена, тренер по очереди пробует эти. */
+    static final String[] FALLBACK_MODELS = {"google/gemma-4-26b-a4b-it:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "openrouter/free"};
     static final Locale RU = new Locale("ru");
     static final int MATCH = -1, WRAP = -2;
 
@@ -1010,16 +1012,26 @@ public class MainActivity extends Activity {
         new Thread(() -> {
             String ans = null, note = null;
             Exception err = null;
-            try {
-                ans = Ai.chat(key, model, msgs);
-            } catch (Exception e1) {
-                err = e1;
-                if (Ai.retryable(e1) && !model.equals(FALLBACK_MODEL)) {
+            ArrayList<String> chain = new ArrayList<>();
+            chain.add(model);
+            for (String m : FALLBACK_MODELS) if (!chain.contains(m)) chain.add(m);
+            // Бесплатные модели часто отвечают «перегружено» (429). Пробуем всю цепочку, потом ещё раз после паузы.
+            outer:
+            for (int round = 0; round < 2; round++) {
+                for (String m : chain) {
                     try {
-                        ans = Ai.chat(key, FALLBACK_MODEL, msgs);
-                        note = "Модель " + model + " не ответила — ответила запасная " + FALLBACK_MODEL + ".";
-                    } catch (Exception ignored) {
+                        ans = Ai.chat(key, m, msgs);
+                        if (!m.equals(model)) note = "Модель " + model + " сейчас перегружена — ответила " + m + ".";
+                        break outer;
+                    } catch (Exception e) {
+                        if (err == null || !Ai.dailyLimit(err)) err = e;
+                        if (!Ai.retryable(e) || Ai.dailyLimit(e)) break outer;
                     }
+                }
+                try {
+                    Thread.sleep(4000);
+                } catch (InterruptedException ie) {
+                    break;
                 }
             }
             final String fAns = ans, fNote = note, fErr = ans == null ? Ai.explain(err) : null;
@@ -1285,7 +1297,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Fitness Couch 2.0.3", 12, MUTED, false));
+        body.addView(t("Fitness Couch 2.0.4", 12, MUTED, false));
     }
 
     void restore() {

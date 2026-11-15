@@ -106,6 +106,13 @@ final class Ai {
         return c == 400 || c == 404 || c == 408 || c == 429 || c >= 500;
     }
 
+    /** OpenRouter сообщает о дневном лимите бесплатных моделей текстом ошибки, например «free-models-per-day». */
+    static boolean dailyLimit(Exception e) {
+        if (!(e instanceof HttpError) || ((HttpError) e).code != 429) return false;
+        String m = e.getMessage() == null ? "" : e.getMessage().toLowerCase(java.util.Locale.US);
+        return m.contains("per-day") || m.contains("per day");
+    }
+
     static String explain(Exception e) {
         if (e instanceof HttpError) {
             int c = ((HttpError) e).code;
@@ -114,7 +121,8 @@ final class Ai {
             if (c == 402) return "На балансе OpenRouter не хватает средств для этой модели.";
             if (c == 403) return "OpenRouter отклонил запрос (403). " + m;
             if (c == 404) return "Модель не найдена. Выбери другую из списка в настройках AI.";
-            if (c == 429) return "Слишком много запросов. Подожди минуту и повтори.";
+            if (c == 429 && dailyLimit(e)) return "Исчерпан дневной лимит бесплатных запросов OpenRouter. Он обнулится завтра.";
+            if (c == 429) return "Все бесплатные модели сейчас перегружены. Подожди пару минут и нажми «Повторить».";
             return "Ошибка OpenRouter " + c + (m.isEmpty() ? "" : ": " + m);
         }
         if (e instanceof java.net.UnknownHostException || e instanceof java.net.ConnectException)
