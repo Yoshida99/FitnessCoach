@@ -162,6 +162,33 @@ final class Store {
         if (any ? days.add(date) : days.remove(date)) p.edit().putStringSet("days", days).apply();
     }
 
+    /** Отметить тренировку завершённой: в журнале она будет подписана этим днём программы. */
+    void finish(String date, String tag) { p.edit().putString("wk_" + date, tag).apply(); }
+
+    String finishedTag(String date) { return p.getString("wk_" + date, null); }
+
+    /** Удалить из журнала все подходы за дату. */
+    void deleteDay(String date) {
+        SharedPreferences.Editor ed = p.edit();
+        Set<String> seen = new HashSet<>();
+        for (Program.Day d : Program.DAYS) {
+            for (Program.Ex e : d.ex) {
+                if (!seen.add(e.id)) continue;
+                JSONArray a = sessions(e.id), out = new JSONArray();
+                boolean changed = false;
+                for (int i = 0; i < a.length(); i++) {
+                    JSONObject s = a.optJSONObject(i);
+                    if (s != null && date.equals(s.optString("d"))) changed = true;
+                    else out.put(a.opt(i));
+                }
+                if (changed) ed.putString("log_" + e.id, out.toString());
+            }
+        }
+        Set<String> days = days();
+        days.remove(date);
+        ed.putStringSet("days", days).remove("wk_" + date).apply();
+    }
+
     int trainedSince(int daysBack) {
         Calendar c = Calendar.getInstance();
         c.add(Calendar.DAY_OF_YEAR, -daysBack + 1);

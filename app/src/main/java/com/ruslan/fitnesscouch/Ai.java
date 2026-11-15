@@ -59,7 +59,7 @@ final class Ai {
             c.setConnectTimeout(20000);
             c.setReadTimeout(90000);
             if (key != null && key.length() > 0) c.setRequestProperty("Authorization", "Bearer " + key);
-            c.setRequestProperty("X-Title", "Fitness Couch");
+            c.setRequestProperty("X-Title", "Fitness Coach");
             if (body != null) {
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/json; charset=utf-8");

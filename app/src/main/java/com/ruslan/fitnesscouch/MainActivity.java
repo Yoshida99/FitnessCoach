@@ -25,6 +25,8 @@ import android.os.SystemClock;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.text.Editable;
+import android.text.SpannableString;
+import android.text.style.ForegroundColorSpan;
 import android.text.InputType;
 import android.text.TextWatcher;
 import android.view.Gravity;
@@ -49,6 +51,8 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Set;
@@ -132,7 +136,57 @@ public class MainActivity extends Activity {
 
         stack.add(this::home);
         if (!p.contains("name")) stack.add(() -> profile(true));
-        render();
+        splash();
+    }
+
+    boolean splashDone;
+
+    /** Заставка при запуске: анимированная фигура и название. Нажатие пропускает её. */
+    void splash() {
+        FrameLayout f = new FrameLayout(this);
+        f.setBackgroundColor(BG);
+        View glow = new View(this);
+        GradientDrawable gd = new GradientDrawable();
+        gd.setGradientType(GradientDrawable.RADIAL_GRADIENT);
+        gd.setColors(new int[]{0x38D9B45A, 0x00D9B45A});
+        gd.setGradientRadius(dp(230));
+        glow.setBackground(gd);
+        f.addView(glow, new FrameLayout.LayoutParams(MATCH, MATCH));
+
+        LinearLayout box = col();
+        box.setGravity(Gravity.CENTER);
+        ExerciseView fig = new ExerciseView(this, Moves.get("squat"), 1f, BG);
+        box.addView(fig, new LinearLayout.LayoutParams(dp(280), dp(182)));
+        SpannableString name = new SpannableString("ФИТНЕС-КОУЧ");
+        name.setSpan(new ForegroundColorSpan(GOLD), 7, name.length(), 0);
+        TextView title = t("", 34, TEXT, true);
+        title.setText(name);
+        title.setTypeface(Typeface.create("sans-serif", Typeface.BOLD));
+        title.setLetterSpacing(0.08f);
+        title.setGravity(Gravity.CENTER);
+        box.addView(title, new LinearLayout.LayoutParams(MATCH, WRAP));
+        TextView sub = t("Тренировки · Прогресс · AI-тренер", 14, MUTED, false);
+        sub.setGravity(Gravity.CENTER);
+        box.addView(sub, new LinearLayout.LayoutParams(MATCH, WRAP));
+        f.addView(box, new FrameLayout.LayoutParams(MATCH, MATCH));
+        setContentView(f);
+
+        fig.setAlpha(0);
+        fig.animate().alpha(1).setDuration(500);
+        title.setAlpha(0);
+        title.setTranslationY(dp(18));
+        title.animate().alpha(1).translationY(0).setStartDelay(250).setDuration(650);
+        sub.setAlpha(0);
+        sub.animate().alpha(1).setStartDelay(600).setDuration(600);
+
+        final Runnable go = () -> {
+            if (splashDone || isFinishing()) return;
+            splashDone = true;
+            setContentView(shell);
+            render();
+        };
+        f.setOnClickListener(v -> go.run());
+        ui.postDelayed(go, 2300);
     }
 
     @Override
@@ -232,7 +286,7 @@ public class MainActivity extends Activity {
         Program.Day day = Program.forDow(now.get(Calendar.DAY_OF_WEEK));
 
         body.addView(label(new SimpleDateFormat("EEEE, d MMMM", RU).format(now.getTime())));
-        body.addView(t(name().isEmpty() ? "Fitness Couch" : "Привет, " + name(), 28, TEXT, true));
+        body.addView(t(name().isEmpty() ? "Фитнес-коуч" : "Привет, " + name(), 28, TEXT, true));
         weekStrip();
 
         LinearLayout c = card();
@@ -269,12 +323,14 @@ public class MainActivity extends Activity {
 
         String[][] tiles = {
                 {"AI-тренер", "Вопросы по технике, весам, питанию"}, {"Программа", "4 тренировки в неделю"},
-                {"Прогресс", "Рекорды, графики, календарь"}, {"Питание", "Калории и белок на день"},
-                {"Таймер", "Отдых между подходами"}, {"Настройки", "Профиль, AI, данные"}};
-        Runnable[] go = {this::chat, this::program, this::progress, this::nutrition, this::timerScreen, this::settings};
+                {"Журнал", "Все прошлые тренировки"}, {"Прогресс", "Рекорды, графики, календарь"},
+                {"Питание", "Калории и белок на день"}, {"Таймер", "Отдых между подходами"},
+                {"Настройки", "Профиль, AI, данные"}};
+        Runnable[] go = {this::chat, this::program, this::journal, this::progress, this::nutrition, this::timerScreen, this::settings};
         for (int i = 0; i < tiles.length; i += 2) {
             LinearLayout r = row();
-            for (int j = i; j < i + 2; j++) {
+            boolean single = i + 1 >= tiles.length;
+            for (int j = i; j < Math.min(i + 2, tiles.length); j++) {
                 final Runnable dest = go[j];
                 LinearLayout tile = card();
                 tile.setMinimumHeight(dp(86));
@@ -283,7 +339,7 @@ public class MainActivity extends Activity {
                 tile.setOnClickListener(v -> open(dest));
                 clickable(tile, 20);
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, MATCH, 1);
-                lp.setMargins(j == i ? 0 : dp(5), dp(10), j == i ? dp(5) : 0, 0);
+                lp.setMargins(j == i ? 0 : dp(5), dp(10), j == i && !single ? dp(5) : 0, 0);
                 r.addView(tile, lp);
             }
             body.addView(r);
@@ -385,8 +441,14 @@ public class MainActivity extends Activity {
         final float sug = suggest(e, last);
 
         LinearLayout head = row();
-        head.addView(t(e.name, 17, TEXT, true), new LinearLayout.LayoutParams(0, WRAP, 1));
-        head.addView(t(e.target(), 14, GOLD, true));
+        final ExerciseView thumb = new ExerciseView(this, Moves.get(e.id), 1.3f, CARD);
+        LinearLayout.LayoutParams tl = new LinearLayout.LayoutParams(dp(86), dp(56));
+        tl.setMargins(-dp(8), 0, dp(6), 0);
+        head.addView(thumb, tl);
+        LinearLayout titles = col();
+        titles.addView(t(e.name, 17, TEXT, true));
+        titles.addView(t(e.target(), 14, GOLD, true));
+        head.addView(titles, new LinearLayout.LayoutParams(0, WRAP, 1));
         c.addView(head);
         c.addView(t(last == null ? "Записей пока нет" : "Прошлый раз, " + Store.human(last.optString("d")) + ": " + describe(last),
                 13, MUTED, false));
@@ -459,12 +521,15 @@ public class MainActivity extends Activity {
 
         final LinearLayout cues = col();
         cues.setVisibility(View.GONE);
+        cues.addView(new ExerciseView(this, Moves.get(e.id), 1f, CARD), new LinearLayout.LayoutParams(MATCH, WRAP));
         for (String s : e.cues) cues.addView(t("•  " + s, 14, SILVER, false));
         cues.addView(t("Острая боль в суставе или спине — остановись, сбрось вес или замени упражнение.", 13, RED, false));
         cues.addView(link("Спросить AI-тренера про технику", () ->
                 ask("Разбери технику упражнения «" + e.name + "»: главные ошибки и как их исправить.")));
         LinearLayout foot = row();
-        foot.addView(link("Техника", () -> cues.setVisibility(cues.getVisibility() == View.GONE ? View.VISIBLE : View.GONE)));
+        final Runnable toggleCues = () -> cues.setVisibility(cues.getVisibility() == View.GONE ? View.VISIBLE : View.GONE);
+        thumb.setOnClickListener(v -> toggleCues.run());
+        foot.addView(link("Техника", toggleCues));
         foot.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1));
         foot.addView(link("Отдых " + Fmt.mmss(e.rest), () -> startRest(e.rest)));
         c.addView(foot);
@@ -545,6 +610,8 @@ public class MainActivity extends Activity {
             body.addView(btn("На главную", false, this::goHome));
             return;
         }
+        st.finish(today, d.tag);
+        body.addView(t("Тренировка сохранена в журнал", 14, GOLD, true));
         LinearLayout stats = row();
         stats.addView(stat("Подходы", (int) pr[0] + " / " + (int) pr[1]), statLp(false));
         stats.addView(stat("Тоннаж", Fmt.n(Math.round(pr[2])) + " кг"), statLp(true));
@@ -567,7 +634,155 @@ public class MainActivity extends Activity {
         body.addView(c);
         body.addView(btn("Разбор от AI-тренера", true, () -> ask("Разбери мою сегодняшнюю тренировку «" + d.title + "»:\n" + log
                 + "Что получилось, где резерв и какие веса ставить в следующий раз?")));
+        body.addView(btn("Открыть журнал", false, () -> open(this::journal)));
         body.addView(btn("На главную", false, this::goHome));
+    }
+
+    // ════════════════════════════════ Журнал ════════════════════════════════
+
+    static ArrayList<Program.Ex> uniqueExercises() {
+        LinkedHashMap<String, Program.Ex> m = new LinkedHashMap<>();
+        for (Program.Day d : Program.DAYS) for (Program.Ex e : d.ex) if (!m.containsKey(e.id)) m.put(e.id, e);
+        return new ArrayList<>(m.values());
+    }
+
+    /** День программы для даты: отмеченный при завершении, иначе тот, где больше всего совпавших упражнений. */
+    Program.Day dayFor(String date) {
+        String tag = st.finishedTag(date);
+        Program.Day best = null;
+        int bestN = 0;
+        for (Program.Day d : Program.DAYS) {
+            if (d.tag.equals(tag)) return d;
+            int n = 0;
+            for (Program.Ex e : d.ex) if (st.session(e.id, date) != null) n++;
+            if (n > bestN) { bestN = n; best = d; }
+        }
+        return best;
+    }
+
+    /** Лучшая оценка подхода в тренировке: расчётный максимум или повторы для упражнений со своим весом. */
+    static float sessionBest(JSONObject s) {
+        float b = 0;
+        for (int k = 0; k < Store.count(s); k++) {
+            int r = Store.rep(s, k);
+            float w = Store.wt(s, k);
+            if (r > 0) b = Math.max(b, w > 0 ? Store.e1rm(w, r) : r);
+        }
+        return b;
+    }
+
+    /** {упражнений, подходов, тоннаж, рекордов} за дату. */
+    float[] daySummary(String date) {
+        float ex = 0, sets = 0, tons = 0, rec = 0;
+        for (Program.Ex e : uniqueExercises()) {
+            JSONObject s = st.session(e.id, date);
+            if (s == null) continue;
+            ex++;
+            for (int k = 0; k < Store.count(s); k++) {
+                int r = Store.rep(s, k);
+                if (r > 0) { sets++; tons += r * Store.wt(s, k); }
+            }
+            float before = st.best(e.id, date)[0];
+            if (before > 0 && sessionBest(s) > before + 0.01f) rec++;
+        }
+        return new float[]{ex, sets, tons, rec};
+    }
+
+    static String longDate(String iso) {
+        try {
+            Date d = new SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(iso);
+            return new SimpleDateFormat("EEEE, d MMMM yyyy", RU).format(d);
+        } catch (Exception e) {
+            return iso;
+        }
+    }
+
+    static String sets(int n) {
+        int m10 = n % 10, m100 = n % 100;
+        String w = m10 == 1 && m100 != 11 ? "подход" : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? "подхода" : "подходов";
+        return n + " " + w;
+    }
+
+    void journal() {
+        topBar("Журнал");
+        ArrayList<String> dates = new ArrayList<>(st.days());
+        Collections.sort(dates, Collections.reverseOrder());
+        if (dates.isEmpty()) {
+            body.addView(t("Здесь будут все твои тренировки. Отмечай подходы на экране тренировки и в конце нажимай «Завершить тренировку».",
+                    15, SILVER, false));
+            body.addView(btn("Открыть программу", true, () -> open(this::program)));
+            return;
+        }
+        LinearLayout stats = row();
+        stats.addView(stat("Всего", String.valueOf(dates.size())), statLp(false));
+        stats.addView(stat("30 дней", String.valueOf(st.trainedSince(30))), statLp(true));
+        body.addView(stats);
+
+        String month = "";
+        String today = Store.today();
+        for (final String date : dates) {
+            String m = date.substring(0, 7);
+            if (!m.equals(month)) {
+                month = m;
+                try {
+                    Date d = new SimpleDateFormat("yyyy-MM", Locale.US).parse(m);
+                    body.addView(label(new SimpleDateFormat("LLLL yyyy", RU).format(d)));
+                } catch (Exception ignored) {
+                }
+            }
+            Program.Day d = dayFor(date);
+            float[] s = daySummary(date);
+            LinearLayout c = card();
+            LinearLayout r = row();
+            r.addView(t(longDate(date).replaceAll(" \\d{4}$", ""), 13, MUTED, false), new LinearLayout.LayoutParams(0, WRAP, 1));
+            if (s[3] > 0) r.addView(t(s[3] == 1 ? "РЕКОРД" : "РЕКОРДОВ: " + (int) s[3], 11, GOLD, true));
+            else if (date.equals(today) && st.finishedTag(date) == null) r.addView(t("ИДЁТ СЕЙЧАС", 11, GOLD, true));
+            c.addView(r);
+            c.addView(t(d == null ? "Тренировка" : d.title, 18, TEXT, true));
+            c.addView(t((int) s[0] + " упр. · " + sets((int) s[1]) + " · тоннаж " + Fmt.n(Math.round(s[2])) + " кг", 13, SILVER, false));
+            c.setOnClickListener(v -> open(() -> journalDay(date)));
+            clickable(c, 20);
+            body.addView(c);
+        }
+    }
+
+    void journalDay(final String date) {
+        final Program.Day d = dayFor(date);
+        topBar(d == null ? "Тренировка" : d.title);
+        String ld = longDate(date);
+        body.addView(t(ld.substring(0, 1).toUpperCase(RU) + ld.substring(1), 14, MUTED, false));
+        float[] sum = daySummary(date);
+        LinearLayout stats = row();
+        stats.addView(stat("Подходы", String.valueOf((int) sum[1])), statLp(false));
+        stats.addView(stat("Тоннаж", Fmt.n(Math.round(sum[2])) + " кг"), statLp(true));
+        body.addView(stats);
+
+        LinearLayout c = card();
+        final StringBuilder log = new StringBuilder();
+        for (final Program.Ex e : uniqueExercises()) {
+            JSONObject s = st.session(e.id, date);
+            if (s == null) continue;
+            float before = st.best(e.id, date)[0];
+            boolean record = before > 0 && sessionBest(s) > before + 0.01f;
+            LinearLayout r = row();
+            r.addView(t(e.name, 15, TEXT, true), new LinearLayout.LayoutParams(0, WRAP, 1));
+            if (record) r.addView(t("РЕКОРД", 11, GOLD, true));
+            c.addView(r);
+            c.addView(t(describe(s), 14, SILVER, false));
+            log.append(e.name).append(": ").append(describe(s)).append(record ? " — личный рекорд" : "").append("\n");
+        }
+        if (log.length() == 0) c.addView(t("Подходов за этот день нет.", 14, MUTED, false));
+        body.addView(c);
+        if (log.length() > 0) {
+            body.addView(btn("Разбор от AI-тренера", true, () -> ask("Разбери мою тренировку от " + longDate(date)
+                    + (d == null ? "" : " («" + d.title + "»)") + ":\n" + log + "Что получилось и что улучшить?")));
+        }
+        body.addView(btn("Удалить запись", false, () -> confirm("Удалить тренировку за " + Store.human(date)
+                + " из журнала? Подходы этого дня пропадут из истории и рекордов.", () -> {
+            st.deleteDay(date);
+            toast("Запись удалена");
+            back();
+        })));
     }
 
     // ════════════════════════════════ Таймер отдыха ════════════════════════════════
@@ -826,6 +1041,10 @@ public class MainActivity extends Activity {
 
     void exercise(Program.Ex e) {
         topBar(e.name);
+        LinearLayout ac = card();
+        ac.addView(new ExerciseView(this, Moves.get(e.id), 1f, CARD), new LinearLayout.LayoutParams(MATCH, WRAP));
+        for (String s : e.cues) ac.addView(t("•  " + s, 14, SILVER, false));
+        body.addView(ac);
         JSONArray a = st.sessions(e.id);
         float[] series = new float[a.length()];
         for (int i = 0; i < series.length; i++) {
@@ -948,7 +1167,7 @@ public class MainActivity extends Activity {
         int[] tg = targets();
         float rate = st.weeklyRate(), waist = st.latest("waist", 0);
         StringBuilder s = new StringBuilder();
-        s.append("Ты персональный фитнес-тренер в приложении Fitness Couch. Отвечай по-русски, конкретно и по делу, ")
+        s.append("Ты персональный фитнес-тренер в приложении «Фитнес-коуч». Отвечай по-русски, конкретно и по делу, ")
                 .append("простым текстом без Markdown-разметки. Называй точные веса, подходы и повторы, опираясь на данные ниже. ")
                 .append("Не ставь диагнозов; при боли советуй снизить нагрузку и обратиться к врачу.\n\n");
         s.append("Атлет: ").append(name().isEmpty() ? "без имени" : name()).append(male() ? ", мужчина, " : ", женщина, ")
@@ -1284,7 +1503,7 @@ public class MainActivity extends Activity {
                 13, MUTED, false));
         body.addView(btn("Скопировать все данные", false, () -> {
             ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-            cm.setPrimaryClip(ClipData.newPlainText("Fitness Couch", st.export()));
+            cm.setPrimaryClip(ClipData.newPlainText("Фитнес-коуч", st.export()));
             toast("Скопировано в буфер обмена");
         }));
         body.addView(btn("Восстановить из копии", false, () -> open(this::restore)));
@@ -1297,7 +1516,7 @@ public class MainActivity extends Activity {
             stack.add(() -> profile(true));
             render();
         })));
-        body.addView(t("Fitness Couch 2.0.4", 12, MUTED, false));
+        body.addView(t("Фитнес-коуч · версия 2.0.5", 12, MUTED, false));
     }
 
     void restore() {
@@ -1320,7 +1539,7 @@ public class MainActivity extends Activity {
 
     void profile(final boolean first) {
         if (first) {
-            body.addView(label("Fitness Couch"));
+            body.addView(label("Фитнес-коуч"));
             body.addView(t("Пара вопросов о тебе", 26, TEXT, true));
             body.addView(t("По этим данным считаются калории и цель по весу, и их видит AI-тренер.", 14, MUTED, false));
         } else {

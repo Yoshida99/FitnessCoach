@@ -32,10 +32,10 @@ jobs:
 
       - name: Publish APK as a release
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk FitnessCouch-2.0.apk
+          cp app/build/outputs/apk/debug/app-debug.apk FitnessCoach.apk
           gh release delete "$TAG" --yes --cleanup-tag || true
           sleep 3
-          gh release create "$TAG" FitnessCouch-2.0.apk \
+          gh release create "$TAG" FitnessCoach.apk \
             --target "$GITHUB_SHA" --prerelease \
-            --title "Fitness Couch 2.0 (сборка $GITHUB_RUN_NUMBER)" \
-            --notes "Автоматическая сборка из ветки $GITHUB_REF_NAME. Скачай FitnessCouch-2.0.apk на телефон и открой его."
+            --title "Фитнес-коуч (сборка $GITHUB_RUN_NUMBER)" \
+            --notes "Автоматическая сборка из ветки $GITHUB_REF_NAME. Скачай FitnessCoach.apk на телефон и открой его."
